@@ -44,6 +44,11 @@ extension UIApplication {
     func downscaleElement(_ sender: AnyObject) {
         EditorController.shared.focusedControl?.resize(down: true)
     }
+
+    @objc
+    func patch_genshin_layout(_ sender: AnyObject) {
+        PlayLoader.patch_genshin_layout()
+    }
 }
 
 extension UIViewController {
@@ -76,6 +81,7 @@ var keymappingSelectors = [#selector(UIApplication.switchEditorMode(_:)),
 class MenuController {
     init(with builder: UIMenuBuilder) {
         builder.insertSibling(MenuController.keymappingMenu(), afterMenu: .view)
+        builder.insertSibling(MenuController.genshinMenu(), afterMenu: .view)
     }
 
     class func keymappingMenu() -> UIMenu {
@@ -103,9 +109,42 @@ class MenuController {
                       options: [],
                       children: [arrowKeysGroup])
     }
+    
+    class func genshinMenu() -> UIMenu {
+        let keyCommands = ["G"]
+        let genshinTitles = [
+            "Patch PS5 layout"
+        ]
+        let genshinSelectors = [
+            #selector(UIApplication.patch_genshin_layout(_:))
+        ]
+        let arrowKeyChildrenCommands = zip(keyCommands, genshinTitles).map { (command, btn) in
+            UIKeyCommand(title: btn,
+                         image: nil,
+                         action: genshinSelectors[genshinTitles.firstIndex(of: btn)!],
+                         input: command,
+                         modifierFlags: .command,
+                         propertyList: [CommandsList.KeymappingToolbox: btn]
+            )
+        }
+
+        let arrowKeysGroup = UIMenu(title: "",
+                                    image: nil,
+                                    identifier: .genshinOptionsMenu,
+                                    options: .displayInline,
+                                    children: arrowKeyChildrenCommands)
+
+        return UIMenu(title: "Genshin",
+                      image: nil,
+                      identifier: .genshinMenu,
+                      options: [],
+                      children: [arrowKeysGroup])
+    }
 }
 
 extension UIMenu.Identifier {
     static var keymappingMenu: UIMenu.Identifier { UIMenu.Identifier("io.playcover.PlayTools.menus.editor") }
     static var keymappingOptionsMenu: UIMenu.Identifier { UIMenu.Identifier("io.playcover.PlayTools.menus.keymapping") }
+    static var genshinMenu: UIMenu.Identifier { UIMenu.Identifier("io.playcover.PlayTools.menus.genshin") }
+    static var genshinOptionsMenu: UIMenu.Identifier { UIMenu.Identifier("io.playcover.PlayTools.menus.genshinoptions") }
 }

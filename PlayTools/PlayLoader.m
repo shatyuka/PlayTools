@@ -167,6 +167,17 @@ DYLD_INTERPOSE(pt_SecItemDelete, SecItemDelete)
 
 @implementation PlayLoader
 
++(void)patch_genshin_layout {
+    vm_region_basic_info_data_64_t info;
+    memset(&info, 0, sizeof(info));
+    mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64;
+    uintptr_t base = 0, region_size = 0;
+    mach_port_t obj;
+    vm_region_64(mach_task_self(), &base, &region_size, VM_REGION_BASIC_INFO_64, (vm_region_info_64_t)&info, &cnt, &obj);
+    if (!base) return;
+    *(uintptr_t*)(base + 0xE7598D8 + 0x1360) = base + 0xF46A30;
+}
+
 static void __attribute__((constructor)) initialize(void) {
     [PlayCover launch];
 }

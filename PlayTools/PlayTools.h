@@ -17,3 +17,4 @@ FOUNDATION_EXPORT const unsigned char PlayToolsVersionString[];
 #import "UIApplication+Private.h"
 #import "UIEvent+Private.h"
 #import "UITouch+Private.h"
+#import "PlayLoader.h"

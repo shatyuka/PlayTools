@@ -11,6 +11,6 @@
             __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacement, (const void*)(unsigned long)&_replacee };
 
 @interface PlayLoader : NSObject
-
++(void)patch_genshin_layout;
 @end
 
