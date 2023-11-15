@@ -175,7 +175,18 @@ DYLD_INTERPOSE(pt_SecItemDelete, SecItemDelete)
     mach_port_t obj;
     vm_region_64(mach_task_self(), &base, &region_size, VM_REGION_BASIC_INFO_64, (vm_region_info_64_t)&info, &cnt, &obj);
     if (!base) return;
-    *(uintptr_t*)(base + 0xE7598D8 + 0x1360) = base + 0xF46A30;
+
+    /*
+     08 48 00 51  SUB W8, W0, #0x12
+     1F 0D 00 71  CMP W8, #3
+     */
+
+    /*
+     20 04 80 52  MOV W0, #0x21
+     C0 03 5F D6  RET
+     */
+
+    *(uintptr_t*)(base + 0xDB340D8 + 0x1390) = base + 0x1C9DBD8;
 }
 
 static void __attribute__((constructor)) initialize(void) {
