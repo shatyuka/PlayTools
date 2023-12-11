@@ -179,6 +179,56 @@ DYLD_INTERPOSE(pt_SecItemAdd, SecItemAdd)
 DYLD_INTERPOSE(pt_SecItemUpdate, SecItemUpdate)
 DYLD_INTERPOSE(pt_SecItemDelete, SecItemDelete)
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
+void bad_char(const unsigned char* str, int size, int badchar[256]) {
+    int i;
+    // Initializing all occurrences as -1
+    for (i = 0; i < 256; i++) badchar[i] = -1;
+
+    // Fill the actual value of last occurrence
+    // of a character
+    for (i = 0; i < size; i++) badchar[str[i]] = i;
+}
+
+const unsigned char* bmsearch(const unsigned char* txt, int n, const unsigned char* pat, int m) {
+    int badchar[256];
+
+    /* Fill the bad character array by calling
+    the preprocessing function bad_char()
+    for given pattern */
+    bad_char(pat, m, badchar);
+
+    int s = 0;
+    while (s <= (n - m)) {
+        int j = m - 1;
+        /* Keep reducing index j of pattern while
+        characters of pattern and text are
+        matching at this shift s */
+        while (j >= 0 && pat[j] == txt[s + j]) j--;
+
+        /* If the pattern is present at current
+        shift, then index j will become -1 after
+        the above loop */
+        if (j < 0) {
+            return txt + s;
+        } else {
+            s += max(1, j - badchar[txt[s + j]]);
+        }
+    }
+    return 0;
+}
+
+uint32_t getbits(uint32_t inst, int a, int b) {
+    return (inst >> a) & (~(~0 << (b - a + 1)));
+}
+
+uint32_t sign_extend(unsigned int number, int numbits){
+    if (number & (1 << (numbits - 1)))
+        return number | ~((1 << numbits) - 1);
+    return number;
+}
+
 @implementation PlayLoader
 
 +(void)patch_genshin_layout {
@@ -189,18 +239,46 @@ DYLD_INTERPOSE(pt_SecItemDelete, SecItemDelete)
     mach_port_t obj;
     vm_region_64(mach_task_self(), &base, &region_size, VM_REGION_BASIC_INFO_64, (vm_region_info_64_t)&info, &cnt, &obj);
     if (!base) return;
+    // NSLog(@"shatyuka: got base: %p, size: 0x%lx", (void*)base, region_size);
 
     /*
      08 48 00 51  SUB W8, W0, #0x12
      1F 0D 00 71  CMP W8, #3
      */
+    const uint8_t* pattern1 = (const uint8_t*)"\x08\x48\x00\x51\x1F\x0D\x00\x71";
+    const uint8_t* found1 = bmsearch((const uint8_t*)base, (int)region_size, pattern1, sizeof(pattern1));
+    if (!found1) return;
+    // NSLog(@"shatyuka: found1: %p", found1);
 
     /*
      20 04 80 52  MOV W0, #0x21
      C0 03 5F D6  RET
      */
+    const uint8_t* pattern2 = (const uint8_t*)"\x20\x04\x80\x52\xC0\x03\x5F\xD6";
+    const uint8_t* found2 = bmsearch((const uint8_t*)base, (int)region_size, pattern2, sizeof(pattern2));
+    if (!found2) return;
+    // NSLog(@"shatyuka: found2: %p", found2);
 
-    *(uintptr_t*)(base + 0xDB340D8 + 0x1390) = base + 0x1C9DBD8;
+    uint32_t inst_adrp = *(uint32_t*)(found1 - 0x18);
+    uint32_t inst_add = *(uint32_t*)(found1 - 0x18 + 4);
+    uint32_t inst_ldr = *(uint32_t*)(found1 - 0x18 + 8);
+    if ((inst_adrp & 0x9F000000) != 0x90000000 ||
+        (inst_add & 0xFFC00000) != 0x91000000 ||
+        (inst_ldr & 0xFFC00000) != 0xF9400000) {
+        // NSLog(@"shatyuka: invalid opcode: %08x %08x %08x", inst_adrp, inst_add, inst_ldr);
+        return;
+    }
+
+    uint32_t adrp_immlo = getbits(inst_adrp, 29, 30);
+    uint32_t adrp_immhi = getbits(inst_adrp, 5, 23);
+    uintptr_t adrl_base = (((uintptr_t)found1 - 0x18) & ~0xFFF) + sign_extend(((adrp_immhi << 2) | adrp_immlo) << 12, 32);
+    uintptr_t adrl_offset = getbits(inst_add, 10, 21);
+    uintptr_t add_offset = (uintptr_t)getbits(inst_ldr, 10, 21) << 3;
+    // NSLog(@"shatyuka: adrl_base: %p", (void*)adrl_base);
+    // NSLog(@"shatyuka: adrl_offset: 0x%lx", adrl_offset);
+    // NSLog(@"shatyuka: add_offset: 0x%lx", add_offset);
+
+    *(const uint8_t**)(adrl_base + adrl_offset + add_offset) = found2;
 }
 
 static void __attribute__((constructor)) initialize(void) {
